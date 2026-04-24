@@ -1,1 +1,62 @@
 
+include \masm64\include64\masm64rt.inc
+
+.data
+    mas1 dd 2, 4, 32      ; a=2, b=4, 32
+    masC dd 4, 16, 25     ; три значення для c
+
+    titl1 db "Програма 2. Обробка масиву.", 0
+    buf1 dq 3 dup (0), 0
+    res1 dd 3 dup (0), 0
+
+    fmt1 db "masm64.", 10, 10
+         db "Обчислити значення виразу 32/b + a*sqrt(c)", 10
+         db "Результат = %d, %d, %d", 10, 10
+         db "Автор: студент 2-го курсу КІ", 0
+
+.code
+entry_point proc
+    lea r10, masC         ; адр. масиву c
+    lea r11, res1         ; адр. результатів
+    mov rcx, 3            ; лічильник
+
+    vmovd xmm1, mas1[0]   ; a
+    vmovd xmm2, mas1[4]   ; b
+    vmovd xmm3, mas1[8]   ; 32
+
+    ; 32 / b (стала частина)
+    vmovd eax, xmm3
+    vmovd ebx, xmm2
+    xor edx, edx
+    div ebx
+    mov r14d, eax         ; r14d = 32/b
+
+@@:
+    vmovd xmm0, dword ptr [r10] ; завантаження c
+    vmovd r15d, xmm0
+    
+    vcvtsi2ss xmm7, xmm7, r15d
+    vsqrtss xmm7, xmm7, xmm7
+    cvttss2si r15d, xmm7  ; r15d = sqrt(c)
+
+    vmovd r8d, xmm1       ; r8d = a
+    mov eax, r8d
+    mul r15d              ; eax = a * sqrt(c)
+
+    add eax, r14d         ; додаємо 32/b
+    mov [r11], eax        ; збереження в res1
+
+    add r10, 4            ; зсув masC
+    add r11, 4            ; зсув res1
+    dec rcx
+    jnz @b
+
+    movsxd r12, res1
+    movsxd r13, res1[4]
+    movsxd r14, res1[8]
+
+    invoke wsprintf, addr buf1, addr fmt1, r12, r13, r14
+    invoke MessageBox, 0, addr buf1, addr titl1, MB_OK
+    invoke ExitProcess, 0
+entry_point endp
+end
