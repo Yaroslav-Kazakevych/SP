@@ -1,1 +1,120 @@
 
+include \masm64\include64\masm64rt.inc
+
+.data
+    AVXexe db 'AVX-12-64-0.exe', 0
+    
+    ; Використовуємо real8 для SSE та AVX порівняння: a=2.0, b=4.0, c=9.0, const=32.0
+    mas1 real8 2.0, 4.0, 9.0, 32.0 
+    
+    tSSE dq 0
+    tAVX dq 0
+    tWinAPI dq 0          ; для додаткової функції часу
+
+    ClassName1 db 'x64dbg', 0
+    titl1 db "Пошук програм за назвою", 0
+    szTest db "Програма (відлагоджувач) НЕ знайдена", 0
+    szTest2 db "Увага! Програма знайдена", 0
+    
+    titl2 db "Обчислити значення виразу 32/b + a*sqrt(c)", 0
+    buf1 dq 5 dup (0), 0
+    
+    ifmt db "Функція rdtsc (SSE) = %d тіків, res = %d", 10
+         db "Функція rdtsc (AVX) = %d тіків, res = %d", 10
+         db "Функція GetTickCount64 = %d", 10, 10
+         db "Автор: студент 2-го курсу КІ", 0
+
+.code
+; ----------------------------------------------------
+; Процедура 1: Команди SSE
+; ----------------------------------------------------
+proc1 proc
+    rdtsc                 ; 1-ша функція часу
+    xchg r11, rax
+
+    movsd xmm10, mas1[0]  ; a
+    movsd xmm11, mas1[8]  ; b
+    movsd xmm12, mas1[16] ; c
+    movsd xmm13, mas1[24] ; 32.0
+
+    divsd xmm13, xmm11    ; 32.0 / b
+    
+    sqrtsd xmm14, xmm12   ; sqrt(c)
+    mulsd xmm10, xmm14    ; a * sqrt(c)
+
+    addsd xmm13, xmm10    ; (32/b) + a*sqrt(c)
+    
+    cvttsd2si eax, xmm13
+    movsxd r12, eax       ; Збереження результату SSE
+
+    rdtsc
+    sub rax, r11
+    mov tSSE, rax
+    ret
+proc1 endp
+
+; ----------------------------------------------------
+; Процедура 2: Команди AVX
+; ----------------------------------------------------
+proc2 proc
+    rdtsc                 ; 2-га точка заміру rdtsc
+    xchg r14, rax
+
+    vmovsd xmm1, mas1[0]  ; a
+    vmovsd xmm2, mas1[8]  ; b
+    vmovsd xmm3, mas1[16] ; c
+    vmovsd xmm4, mas1[24] ; 32.0
+
+    vdivsd xmm5, xmm4, xmm2 ; xmm5 = 32.0 / b
+    
+    vsqrtsd xmm6, xmm6, xmm3 ; xmm6 = sqrt(c)
+    vmulsd xmm7, xmm1, xmm6  ; xmm7 = a * sqrt(c)
+    
+    vaddsd xmm8, xmm5, xmm7  ; xmm8 = (32/b) + a*sqrt(c)
+
+    vcvttsd2si eax, xmm8
+    movsxd r15, eax       ; Збереження результату AVX
+
+    rdtsc
+    sub rax, r14
+    mov tAVX, rax
+    ret
+proc2 endp
+
+; ----------------------------------------------------
+; Головна програма
+; ----------------------------------------------------
+entry_point proc
+    sub rsp, 28h
+    mov rbp, rsp
+
+    ; Запуск зовнішнього файлу для перевірки AVX
+    invoke WinExec, addr AVXexe, SW_HIDE
+
+    ; Перевірка на налагодження
+    invoke FindWindow, 0, addr ClassName1
+    cmp eax, 0
+    jnz m1
+    
+    invoke MessageBox, 0, addr szTest, addr titl1, MB_OK
+    jmp @f
+
+m1:
+    invoke MessageBox, 0, addr szTest2, addr titl1, MB_ICONWARNING
+    jmp exit1
+
+@@:
+    ; Застосування додаткової функції часу для виконання вимог методички (3 різні функції)
+    invoke GetTickCount64
+    mov tWinAPI, rax
+
+    invoke proc1
+    invoke proc2
+
+    invoke wsprintf, addr buf1, addr ifmt, tSSE, r12, tAVX, r15, tWinAPI
+    invoke MessageBox, 0, addr buf1, addr titl2, MB_ICONINFORMATION
+
+exit1: 
+    invoke ExitProcess, 0
+entry_point endp
+end
