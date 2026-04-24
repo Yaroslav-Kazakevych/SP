@@ -1,1 +1,60 @@
+include \masm64\include64\masm64rt.inc
+
+.data
+    mas1 dd 3, 2, 32      ; a=3, b=2, 32
+    masC dd 9, 36, 49     ; c
+
+    titl1 db "Програма 3. Обробка чисел AVX.", 0
+    buf1 dq 3 dup (0), 0
+    res1 dd 3 dup (0), 0
+
+    fmt1 db "masm64.", 10, 10
+         db "Обчислити значення виразу 32/b + a*sqrt(c)", 10
+         db "Результат = %d, %d, %d", 10, 10
+         db "Автор: студент 2-го курсу КІ", 0
+
+.code
+entry_point proc
+    lea rbx, masC         ; адр. masC
+    lea rdx, res1         ; адр. res1
+    mov rcx, 3            ; лічильник значень однієї зі змінних
+
+    vmovd xmm1, mas1[0]   ; a
+    vmovd xmm2, mas1[4]   ; b
+    vmovd xmm3, mas1[8]   ; 32
+
+    ; Підготовка константи 32/b
+    vmovd eax, xmm3
+    vmovd r8d, xmm2
+    xor r9, r9
+    div r8d
+    mov r12d, eax         ; зберегли 32/b
+
+@@:
+    vmovd xmm0, dword ptr [rbx] ; поточне c
+    vmovd r10d, xmm0
+    vcvtsi2ss xmm0, xmm0, r10d
+    vsqrtss xmm0, xmm0, xmm0
+    cvttss2si r10d, xmm0  ; sqrt(c)
+
+    vmovd eax, xmm1       ; a
+    mul r10d              ; a * sqrt(c)
+    
+    add eax, r12d         ; (a * sqrt(c)) + (32/b)
+    mov [rdx], eax
+
+    add rbx, 4
+    add rdx, 4
+    dec rcx
+    jnz @b
+
+    movsxd r10, res1
+    movsxd r11, res1[4]
+    movsxd r12, res1[8]
+
+    invoke wsprintf, addr buf1, addr fmt1, r10, r11, r12
+    invoke MessageBox, 0, addr buf1, addr titl1, MB_OK
+    invoke ExitProcess, 0
+entry_point endp
+end
 
