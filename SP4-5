@@ -1,14 +1,17 @@
 include \masm64\include64\masm64rt.inc
 
 .data
-    ; Зовнішні файли та назви для антиналагодження
     AVXexe db 'AVX-12-64-0.exe', 0
     ClassName db 'x64dbg', 0
     titl1 db "Лабораторна робота №4 - Варіант 5", 0
     szDbgFound db "Увага: Знайдено засіб налагодження!", 0
     szNoDbg db "Налагоджувачів не виявлено. Продовження...", 0
 
-    ; Дані для обчислень (real8 для точності SSE/AVX): a=2.0, b=4.0, c=16.0, const=32.0
+    ; Дані для обчислень (real8 для точності SSE/AVX): 
+    a=2.0, 
+    b=4.0, 
+    c=16.0, 
+    const=32.0
     mas1 real8 2.0, 4.0, 16.0, 32.0 
     
     ; Змінні для збереження результатів та часу
@@ -84,10 +87,10 @@ entry_point proc
         invoke MessageBox, 0, addr szNoDbg, addr titl1, MB_OK
     .endif
 
-    ; 2. Запуск зовнішнього файлу (вимога методички)
+    ; 2. Запуск зовнішнього файлу
     invoke WinExec, addr AVXexe, SW_HIDE
 
-    ; 3. Використання 3-х функцій часу (згідно з варіантом 5)
+    ; 3. Використання 3-х функцій часу
     
     ; Функція 1: GetTickCount64 (WinAPI)
     invoke GetTickCount64
