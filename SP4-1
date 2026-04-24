@@ -1,1 +1,48 @@
 
+include \masm64\include64\masm64rt.inc
+
+.data
+    mas1 dd 2, 4, 9, 32   ; a=2, b=4, c=9, константа=32
+    
+    titl1 db "Програма 1. AVX команди.", 0
+    buf1 dq 0, 0          ; буфер
+    res1 dd 0, 0
+
+    fmt1 db "masm64.", 10, 10
+         db "Обчислити значення виразу 32/b + a*sqrt(c)", 10
+         db "Результат = %d", 10, 10
+         db "Автор: студент 2-го курсу КІ", 0
+
+.code
+entry_point proc
+    vmovd xmm1, mas1[0]   ; a
+    vmovd xmm2, mas1[4]   ; b
+    vmovd xmm3, mas1[8]   ; c
+    vmovd xmm4, mas1[12]  ; 32
+
+    ; Обчислення 32 / b
+    vmovd eax, xmm4
+    vmovd ebx, xmm2
+    xor edx, edx
+    div ebx               ; eax = 32 / b
+    mov r10d, eax         ; збереження результату ділення
+
+    ; Обчислення a * sqrt(c)
+    vmovd r11d, xmm3      ; c
+    vcvtsi2ss xmm0, xmm0, r11d ; перетв. цілого в дійсне
+    vsqrtss xmm0, xmm0, xmm0   ; корінь
+    cvttss2si r11d, xmm0       ; перетв. в ціле (sqrt(c))
+    
+    vmovd r12d, xmm1      ; a
+    mov eax, r12d
+    mul r11d              ; eax = a * sqrt(c)
+
+    ; Фінальне додавання
+    add eax, r10d         ; 32/b + a*sqrt(c)
+    mov res1, eax
+
+    invoke wsprintf, addr buf1, addr fmt1, res1
+    invoke MessageBox, 0, addr buf1, addr titl1, MB_ICONINFORMATION
+    invoke ExitProcess, 0
+entry_point endp
+end
