@@ -1,0 +1,115 @@
+include \masm64\include64\masm64rt.inc
+
+.data
+    ; Зовнішні файли та назви для антиналагодження
+    AVXexe db 'AVX-12-64-0.exe', 0
+    ClassName db 'x64dbg', 0
+    titl1 db "Лабораторна робота №4 - Варіант 5", 0
+    szDbgFound db "Увага: Знайдено засіб налагодження!", 0
+    szNoDbg db "Налагоджувачів не виявлено. Продовження...", 0
+
+    ; Дані для обчислень (real8 для точності SSE/AVX): a=2.0, b=4.0, c=16.0, const=32.0
+    mas1 real8 2.0, 4.0, 16.0, 32.0 
+    
+    ; Змінні для збереження результатів та часу
+    tSSE dq 0
+    tAVX dq 0
+    tTicks dq 0           ; rdtsc
+    tKeTick dq 0          ; Для KeQueryTickCount
+    tWinAPI dq 0          ; GetTickCount64
+    
+    resSSE dq 0
+    resAVX dq 0
+
+    buf1 dq 10 dup (0), 0
+    fmt1 db "Результати обчислення (32/b + a*sqrt(c)):", 10, 10
+         db "1. Функція rdtsc (SSE): %d тіків, Res: %d", 10
+         db "2. Функція rdtsc (AVX): %d тіків, Res: %d", 10
+         db "3. GetTickCount64: %d мс", 10
+         db "4. KeQueryTickCount: %d (лічильник)", 10, 10
+         db "Автор: студент 2-го курсу КІ [Прізвище]", 0
+
+.code
+; --- Процедура обчислення через SSE ---
+calc_sse proc
+    rdtsc
+    mov r11, rax
+    
+    movsd xmm0, mas1[24]  ; 32.0
+    divsd xmm0, mas1[8]   ; 32.0 / b
+    
+    movsd xmm1, mas1[16]  ; c
+    sqrtsd xmm1, xmm1     ; sqrt(c)
+    mulsd xmm1, mas1[0]   ; a * sqrt(c)
+    
+    addsd xmm0, xmm1      ; (32/b) + (a*sqrt(c))
+    cvttsd2si rax, xmm0
+    mov resSSE, rax
+    
+    rdtsc
+    sub rax, r11
+    mov tSSE, rax
+    ret
+calc_sse endp
+
+; --- Процедура обчислення через AVX ---
+calc_avx proc
+    rdtsc
+    mov r11, rax
+    
+    vmovsd xmm0, mas1[24] ; 32.0
+    vdivsd xmm1, xmm0, mas1[8]  ; xmm1 = 32 / b
+    
+    vsqrtsd xmm2, xmm2, mas1[16] ; xmm2 = sqrt(c)
+    vmulsd xmm3, xmm2, mas1[0]   ; xmm3 = a * sqrt(c)
+    
+    vaddsd xmm4, xmm1, xmm3      ; xmm4 = результат
+    vcvttsd2si rax, xmm4
+    mov resAVX, rax
+    
+    rdtsc
+    sub rax, r11
+    mov tAVX, rax
+    ret
+calc_avx endp
+
+; --- Головна точка входу ---
+entry_point proc
+    ; 1. Антиналагодження
+    invoke FindWindow, 0, addr ClassName
+    .if rax != 0
+        invoke MessageBox, 0, addr szDbgFound, addr titl1, MB_ICONWARNING
+        invoke ExitProcess, 0
+    .else
+        invoke MessageBox, 0, addr szNoDbg, addr titl1, MB_OK
+    .endif
+
+    ; 2. Запуск зовнішнього файлу (вимога методички)
+    invoke WinExec, addr AVXexe, SW_HIDE
+
+    ; 3. Використання 3-х функцій часу (згідно з варіантом 5)
+    
+    ; Функція 1: GetTickCount64 (WinAPI)
+    invoke GetTickCount64
+    mov tWinAPI, rax
+    
+    ; Функція 2: KeQueryTickCount (реалізація для користувацького режиму через SharedUserData)
+    ; В ОС Windows за адресою 0x7FFE0000 знаходиться структура KUSER_SHARED_DATA
+    ; Поле TickCountLow знаходиться за зміщенням 0x320
+    mov rdx, 07FFE0000h
+    mov eax, [rdx+320h]
+    mov tKeTick, rax
+
+    ; Функція 3: rdtsc (використовується всередині процедур)
+
+    ; 4. Виконання обчислень
+    call calc_sse
+    call calc_avx
+
+    ; 5. Виведення результатів одним макросом (wsprintf + MessageBox)
+    invoke wsprintf, addr buf1, addr fmt1, tSSE, resSSE, tAVX, resAVX, tWinAPI, tKeTick
+    invoke MessageBox, 0, addr buf1, addr titl1, MB_ICONINFORMATION
+
+    invoke ExitProcess, 0
+entry_point endp
+end
